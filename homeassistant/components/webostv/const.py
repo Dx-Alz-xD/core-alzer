@@ -25,7 +25,8 @@ LIVE_TV_APP_ID = "com.webos.app.livetv"
 WEBOSTV_EXCEPTIONS = (
     ConnectionResetError,
     WebOsTvCommandError,
-    aiohttp.ClientConnectorError,
+    # Also covers ClientConnectorError, and a reset while connecting to a TV in standby
+    aiohttp.ClientOSError,
     aiohttp.ServerDisconnectedError,
     aiohttp.WSMessageTypeError,
     asyncio.CancelledError,

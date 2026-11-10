@@ -3,6 +3,7 @@
 from datetime import timedelta
 from http import HTTPStatus
 
+import aiohttp
 from aiowebostv import WebOsTvPairError
 from freezegun.api import FrozenDateTimeFactory
 import pytest
@@ -584,11 +585,23 @@ async def test_app_id(hass: HomeAssistant, client) -> None:
     assert hass.states.get(ENTITY_ID).attributes[ATTR_APP_ID] == "com.webos.app.home"
 
 
+@pytest.mark.parametrize(
+    "exception",
+    [
+        pytest.param(TimeoutError(), id="timeout"),
+        # A TV in standby can reset the connection instead of timing out
+        pytest.param(
+            aiohttp.ClientOSError(104, "Connection reset by peer"),
+            id="connection_reset",
+        ),
+    ],
+)
 async def test_client_disconnected(
     hass: HomeAssistant,
     client,
     caplog: pytest.LogCaptureFixture,
     freezer: FrozenDateTimeFactory,
+    exception: Exception,
 ) -> None:
     """Test error not raised when client is disconnected."""
     await setup_webostv(hass)
@@ -617,11 +630,12 @@ async def test_client_disconnected(
     )
 
     client.is_connected.return_value = False
-    client.connect.side_effect = TimeoutError
+    client.connect.side_effect = exception
 
     await mock_scan_interval(hass, freezer)
 
-    assert "TimeoutError" not in caplog.text
+    assert type(exception).__name__ not in caplog.text
+    assert hass.states.get(ENTITY_ID).state != STATE_UNAVAILABLE
 
 
 async def test_client_key_update_on_connect(
